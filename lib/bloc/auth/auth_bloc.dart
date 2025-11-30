@@ -13,10 +13,10 @@ class EnterEmail extends AuthEvent
   EnterEmail(this.email);
 }
 
-class EnterPassword extends AuthEvent {
+class EnterPasswordEvent extends AuthEvent {
   final String email;
   final String password;
-  EnterPassword(this.email, this.password);
+  EnterPasswordEvent(this.email, this.password);
 }
 
 class SendCodeEvent extends AuthEvent {
@@ -24,10 +24,17 @@ class SendCodeEvent extends AuthEvent {
   SendCodeEvent(this.email);
 }
 
-class EnterCode extends AuthEvent {
+class RegistrationEvent extends AuthEvent {
+  final String email;
+  final String password;
+  final String username;
+  RegistrationEvent(this.email, this.username, this.password);
+}
+
+class EnterCodeEvent extends AuthEvent {
   final String email;
   final String code;
-  EnterCode(this.email, this.code);
+  EnterCodeEvent(this.email, this.code);
 }
 
 class BackToEmail extends AuthEvent {
@@ -50,9 +57,12 @@ class AuthInitial extends AuthState {
 class EmailExistsState extends AuthState {
   EmailExistsState({String? errorMessage}) : super(errorMessage: errorMessage);
 }
+
 class NewEmailState extends AuthState {
-  NewEmailState({String? errorMessage}) : super(errorMessage: errorMessage);
+  final bool isVerifiedCode;
+  NewEmailState({this.isVerifiedCode = false, String? errorMessage}) : super(errorMessage: errorMessage);
 }
+
 class Authenticated extends AuthState{}
 
 
@@ -111,8 +121,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       return;
     },);
 
+    on<RegistrationEvent>((event, emit) async {
+      if(event.password.length < 8)
+      {
+        emit(NewEmailState(isVerifiedCode: true, errorMessage: "Пароль должен содержать минимум 8 символов"));
+      }
+
+      if(event.username.length < 2)
+      {
+        emit(NewEmailState(isVerifiedCode: true, errorMessage: "Имя должно быть длиной минимум 2 букв"));
+        return;
+      }
+      
+
+      RegisterResult result = await userRepository.register(email: event.email, username: event.username, password: event.password);
+
+      if(result.success == true)
+      {
+        emit(Authenticated());
+      }
+      else
+      {
+        emit(NewEmailState(isVerifiedCode: true, errorMessage: result.error));
+      }
+    
+    },);
+
     //  Password Enter (authentication)
-    on<EnterPassword>((event, emit) async {
+    on<EnterPasswordEvent>((event, emit) async {
 
       if(event.password.isEmpty) {
         emit(EmailExistsState(errorMessage: "Введите корректный пароль"));
@@ -134,11 +170,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
 
     //  Code enter (registration)
-    on<EnterCode>((event, emit) async {
+    on<EnterCodeEvent>((event, emit) async {
       bool isVerified = await userRepository.verifyCode(event.email, event.code);
 
       if (isVerified) {
-        emit(Authenticated());
+        emit(NewEmailState(isVerifiedCode: true));
       } else {
         emit(NewEmailState(errorMessage: "Неверный код"));
       }
