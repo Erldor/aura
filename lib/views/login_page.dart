@@ -12,27 +12,43 @@ enum AuthPage {
   CodePage
 }
 
-
 class LoginPage extends StatelessWidget {
 
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController codeController = TextEditingController();
+  TextEditingController usernameController = TextEditingController();
 
   LoginPage({super.key});
 
-  TextField AuthInputField({String text = "", required TextEditingController controller, bool isPassword = false})
+  void controllersReset()
   {
-    return TextField(obscureText: isPassword, controller: controller, decoration: 
-      InputDecoration(labelText: text, labelStyle: TextStyle(color: AppTheme.mainTextColor), focusColor: AppTheme.mainYellowColor, 
-      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.mainYellowColor), 
-      borderRadius: BorderRadius.all(Radius.circular(10)),), 
-      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)))),
-    );
+    emailController = TextEditingController();
+    passwordController = TextEditingController();
+    codeController = TextEditingController();
+    usernameController = TextEditingController();
+  }
+
+  Widget AuthInputField({String text = "", required TextEditingController controller, bool isPassword = false})
+  {
+    if(!isPassword)
+    {
+      return TextField(obscureText: false, controller: controller, decoration: 
+        InputDecoration(labelText: text, labelStyle: TextStyle(color: AppTheme.mainTextColor), focusColor: AppTheme.mainYellowColor,
+        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.mainYellowColor), 
+        borderRadius: BorderRadius.all(Radius.circular(10)),), 
+        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)))),
+      );
+    }
+    else
+    {
+      return PasswordTextField(controller: controller);
+    }
   }
 
   Widget AuthWidget(BuildContext context, AuthPage authPage)
   {
+    late final bool isObscured;
     late final String widgetLabel;
     late final String inputText;
     late final String buttonText;
@@ -42,6 +58,7 @@ class LoginPage extends StatelessWidget {
     switch(authPage)
     {
       case AuthPage.EmailPage:
+        isObscured = false;
         widgetLabel = "Вход / Регистрация";
         inputText = "Почта";
         buttonText = "Далее";
@@ -52,22 +69,24 @@ class LoginPage extends StatelessWidget {
       break;
 
       case AuthPage.PasswordPage:
+        isObscured = true;
         widgetLabel = "Введите пароль";
         inputText = "Пароль";
         buttonText = "Вход";
         controller = passwordController;
         buttonFunction = () {
-          context.read<AuthBloc>().add(EnterPassword(emailController.text, controller.text));
+          context.read<AuthBloc>().add(EnterPasswordEvent(emailController.text, controller.text));
         };
       break;
 
       case AuthPage.CodePage:
+        isObscured = false;
         widgetLabel = "Введите код";
         inputText = "Код";
         buttonText = "Регистрироваться";
         controller = codeController;
         buttonFunction = () {
-          context.read<AuthBloc>().add(EnterCode(emailController.text, controller.text));
+          context.read<AuthBloc>().add(EnterCodeEvent(emailController.text, controller.text));
         };
       break;
     }
@@ -83,11 +102,87 @@ class LoginPage extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(widgetLabel, style: TextStyle(fontSize: 20),),
           SizedBox(height: 10,),
-          AuthInputField(text: inputText, controller: controller),
+          AuthInputField(text: inputText, controller: controller, isPassword: isObscured),
           SizedBox(height: 10,),
-          ElevatedButton(onPressed: (){buttonFunction();}, child: Text(buttonText,))
+          ElevatedButton(onPressed: (){
+            FocusScope.of(context).unfocus();
+            buttonFunction();
+            }, child: Text(buttonText,))
         ],),
       )
+    );
+  }
+
+  Widget InitializationWidget(BuildContext context)
+  {
+    return Container(width: MediaQuery.of(context).size.width*0.8, constraints: BoxConstraints(maxWidth: 700), decoration: 
+      BoxDecoration(
+        color: AppTheme.bottomNavigationColor,
+        borderRadius: BorderRadius.all(Radius.circular(30)),
+        boxShadow: [BoxShadow(color: Colors.black, blurRadius: 20)]
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text("Регистрация", style: TextStyle(fontSize: 20),),
+          SizedBox(height: 10,),
+          AuthInputField(text: "Имя", controller: usernameController),
+          SizedBox(height: 10,),
+          AuthInputField(text: "Пароль", controller: passwordController, isPassword: true),
+          SizedBox(height: 10,),
+          ElevatedButton(onPressed: (){context.read<AuthBloc>().add(RegistrationEvent(emailController.text, usernameController.text, passwordController.text));}, child: Text("Завершить"))
+        ],),
+      )
+    );
+  }
+
+  Widget OverlayWidget(BuildContext context, OverlayEntry? entry)
+  {
+    return Align(
+      alignment: Alignment.center,
+      child: Container(width: MediaQuery.of(context).size.width*0.8, constraints: BoxConstraints(maxWidth: 700), decoration: 
+        BoxDecoration(
+          color: AppTheme.bottomNavigationColor,
+          borderRadius: BorderRadius.all(Radius.circular(30)),
+          boxShadow: [BoxShadow(color: Colors.black, blurRadius: 20)]
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 20, height: 20,),
+                Expanded(child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text("Хотите отменить регистрацию?", textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontFamily: "Montserrat", fontWeight: FontWeight.normal, color: AppTheme.mainTextColor, decoration: TextDecoration.none),),
+                )),
+                IconButton(onPressed: (){
+                    entry?.remove();
+                    entry = null;
+                  },  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                  style: ButtonStyle(
+                    padding: WidgetStateProperty.all(EdgeInsets.all(5)),
+                    minimumSize: WidgetStateProperty.all(Size.zero),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  iconSize: 20,
+                  icon: Icon(Icons.close)
+                )
+              ],
+            ),
+            SizedBox(height: 10,),
+            ElevatedButton(onPressed: (){
+              FocusScope.of(context).unfocus();
+              controllersReset();
+              entry?.remove();
+              entry = null;
+              context.read<AuthBloc>().add(BackToEmail());
+            }, child: Text("Отменить",)),
+            SizedBox(height: 8,),
+          ],),
+        )
+      ),
     );
   }
 
@@ -97,11 +192,32 @@ class LoginPage extends StatelessWidget {
       body: Stack(children: [
         AnimatedBackground(),
         BlocBuilder<AuthBloc, AuthState>(builder: (context, state) {
-          if(state is NewEmailState || state is EmailExistsState)
+          if(state is NewEmailState)
           {
             return SafeArea(
               top: true,
               child: Positioned(top: 10, left: 10, child: IconButton(onPressed: (){
+                FocusScope.of(context).unfocus();
+                OverlayEntry? entry;
+                entry = OverlayEntry(builder: (overlayContext) => Stack(
+                  children: [GestureDetector(onTap: () {
+                    entry?.remove();
+                    entry = null;
+                  }, child: Positioned.fill(child: Container(color: const Color.fromARGB(182, 0, 0, 0),))), OverlayWidget(context, entry)],
+                ),);
+                Overlay.of(context).insert(entry!);
+
+              //  context.read<AuthBloc>().add(BackToEmail());
+              }, icon: Icon(Icons.arrow_back_outlined))),
+            );
+          }
+          else if(state is EmailExistsState)
+          {
+            return SafeArea(
+              top: true,
+              child: Positioned(top: 10, left: 10, child: IconButton(onPressed: (){
+                FocusScope.of(context).unfocus();
+                controllersReset();
                 context.read<AuthBloc>().add(BackToEmail());
               }, icon: Icon(Icons.arrow_back_outlined))),
             );
@@ -126,7 +242,7 @@ class LoginPage extends StatelessWidget {
               }
               else if(state is NewEmailState)
               {
-                return AuthWidget(context, AuthPage.CodePage);
+                return state.isVerifiedCode ? InitializationWidget(context) : AuthWidget(context, AuthPage.CodePage);
               }
 
               return AuthWidget(context, AuthPage.EmailPage);
@@ -150,5 +266,31 @@ class _AnimatedBackground extends State<AnimatedBackground> {
   @override
   Widget build(BuildContext context) {
     return Lottie.asset("assets/animations/bckg.json", height: MediaQuery.of(context).size.height, animate: true, repeat: true, fit: BoxFit.cover);
+  }
+}
+
+class PasswordTextField extends StatefulWidget {
+  final TextEditingController controller;
+  PasswordTextField({super.key, required this.controller});
+
+  @override
+  State<PasswordTextField> createState() => _PasswordTextFieldState();
+}
+
+class _PasswordTextFieldState extends State<PasswordTextField> {
+  bool _isObscured = true;
+  @override
+  Widget build(BuildContext context) {
+    return TextField(obscureText: _isObscured, controller: widget.controller, decoration: 
+      InputDecoration(labelText: "Пароль", labelStyle: TextStyle(color: AppTheme.mainTextColor), focusColor: AppTheme.mainYellowColor,
+      suffixIcon: IconButton(onPressed: () {
+        setState(() {
+          _isObscured = !_isObscured;
+        });
+      }, icon: Icon(_isObscured ? Icons.visibility : Icons.visibility_off)), 
+      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.mainYellowColor), 
+      borderRadius: BorderRadius.all(Radius.circular(10)),), 
+      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)))),
+    );
   }
 }
